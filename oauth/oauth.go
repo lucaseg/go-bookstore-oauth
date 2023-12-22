@@ -3,7 +3,7 @@ package oauth
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/lucaseg/go-bookstore-oauth/oauth/errors"
+	"github.com/lucaseg/go-bookstore-utils/rest_errors"
 	"github.com/mercadolibre/golang-restclient/rest"
 	"net/http"
 	"strconv"
@@ -66,7 +66,7 @@ func GetCallerId(request *http.Request) int64 {
 	return callerId
 }
 
-func AuthenticateRequest(request *http.Request) *errors.RestError {
+func AuthenticateRequest(request *http.Request) *rest_errors.RestError {
 	if request == nil {
 		return nil
 	}
@@ -79,6 +79,9 @@ func AuthenticateRequest(request *http.Request) *errors.RestError {
 
 	at, err := getAccessToken(accessToken)
 	if err != nil {
+		if err.Status == http.StatusNotFound {
+			return nil
+		}
 		return err
 	}
 	request.Header.Add(headerXClientId, fmt.Sprintf("%v", at.ClientId))
@@ -94,18 +97,18 @@ func cleanRequest(request *http.Request) {
 	request.Header.Del(headerXClientId)
 }
 
-func getAccessToken(token string) (*accessToken, *errors.RestError) {
+func getAccessToken(token string) (*accessToken, *rest_errors.RestError) {
 	response := oauthRestClient.Get(fmt.Sprintf("/oauth/access_token/%s", token))
 
 	if response == nil || response.Response == nil {
-		return nil, errors.InternalServerError("Invalid rest client error trying to login user")
+		return nil, rest_errors.InteralServerError("Invalid rest client error trying to login user")
 	}
 
 	if response.StatusCode != http.StatusOK {
-		var responseError errors.RestError
+		var responseError rest_errors.RestError
 
 		if err := json.Unmarshal(response.Bytes(), &responseError); err != nil {
-			return nil, errors.InternalServerError("Unexpected response error")
+			return nil, rest_errors.InteralServerError("Unexpected response error")
 		}
 
 		if response.StatusCode == http.StatusInternalServerError {
@@ -116,7 +119,7 @@ func getAccessToken(token string) (*accessToken, *errors.RestError) {
 
 	var at accessToken
 	if err := json.Unmarshal(response.Bytes(), &at); err != nil {
-		return nil, errors.InternalServerError("Error trying to unmarshal user login response")
+		return nil, rest_errors.InteralServerError("Error trying to unmarshal user login response")
 	}
 	return &at, nil
 }
